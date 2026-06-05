@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out-tsc/
+tmp/
+
+# Angular
+.angular/
+frontend/dist/
+
+# Backend
+backend/dist/
+
+# Local SQLite database (re-seeded on backend startup)
+backend/tutorstream.db
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Test / coverage
+coverage/
+__screenshots__/
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+
+# OS
+.DS_Store
+Thumbs.db
