@@ -3,7 +3,7 @@
   "private": true,
   "description": "TutorStream — Continue Learning (backend + frontend)",
   "scripts": {
-    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend --legacy-peer-deps",
     "postinstall": "npm run install:all",
     "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev --prefix backend\" \"npm run start --prefix frontend\"",
     "start": "npm run dev"

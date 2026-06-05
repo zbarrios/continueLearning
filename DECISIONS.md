@@ -78,6 +78,12 @@ UPDATE progress SET
 
 **Rationale:** The Continue button is always visible and always leads somewhere obvious. The goal is zero hesitation on open — either resume work or discover the next course. A smarter recommender (popularity, skill graph, completion patterns) would be the next step; this build uses a simple enrollment-based mix.
 
+### Demo-only: student switcher (out of scope)
+
+The **"Viewing as:"** dropdown and `GET /api/students` were **not** required by the challenge. We added them to switch quickly between the three seeded students (in-progress, complete, not started) while testing Continue, progress, and recommendations.
+
+**For reviewers:** Treat this as demo tooling, not part of the core submission. The switcher code is AI-generated and not representative of production auth.
+
 ---
 
 ## 2. Architecture Sketch
