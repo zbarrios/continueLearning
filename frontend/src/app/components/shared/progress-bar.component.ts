@@ -1,41 +1,20 @@
-/**
- * PROGRESS BAR COMPONENT
- * ======================
- * A reusable progress bar that shows "45% (5 of 10 lessons)"
- * 
- * Angular components have three parts:
- * 1. @Component decorator — metadata (like annotations in Java)
- * 2. Class — the logic (like a Java class)
- * 3. Template — the HTML (inline or separate file)
- * 
- * Comparison to React:
- * React: function ProgressBar({ percent, completed, total }) { ... }
- * Angular: @Component({...}) export class ProgressBarComponent { @Input() percent = 0; }
- * 
- * @Input() is like React props — data passed from parent to child
- */
-
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
-  selector: 'app-progress-bar',  // How you use it: <app-progress-bar>
-  standalone: true,              // Angular 22 standalone component (no NgModule needed)
-  imports: [CommonModule],       // What this component uses
+  selector: 'app-progress-bar',
+  standalone: true,
+  imports: [CommonModule],
   template: `
-    <!-- The progress bar container -->
     <div class="progress-container">
-      <!-- The filled portion -->
-      <div 
-        class="progress-fill" 
+      <div
+        class="progress-fill"
         [style.width.%]="percent"
         [class.completed]="percent === 100"
       ></div>
     </div>
-    
-    <!-- The text label -->
     <div class="progress-text">
-      {{ percent }}% 
+      {{ percent }}%
       <span class="lesson-count" *ngIf="showLessonCount">
         ({{ completedCount }} of {{ totalCount }} lessons)
       </span>
@@ -73,8 +52,6 @@ import { CommonModule } from '@angular/common';
   `]
 })
 export class ProgressBarComponent {
-  // @Input() means this value comes from the parent component
-  // Like props in React: <ProgressBar percent={45} />
   @Input() percent: number = 0;
   @Input() completedCount: number = 0;
   @Input() totalCount: number = 0;

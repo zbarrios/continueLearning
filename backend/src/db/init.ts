@@ -1,10 +1,4 @@
-/**
- * DATABASE INITIALIZATION SCRIPT
- * ==============================
- * Run this with: npm run db:init
- */
-
-import { initializeDatabase, initializeSchema, seedDatabase, seedRecommendedCourses } from './database.js';
+import { initializeDatabase, initializeSchema, seedDatabase } from './database.js';
 
 async function init() {
   console.log('Initializing TutorStream database...\n');
@@ -12,7 +6,6 @@ async function init() {
   await initializeDatabase();
   initializeSchema();
   seedDatabase();
-  seedRecommendedCourses();
 
   console.log('\nDatabase ready!');
   process.exit(0);

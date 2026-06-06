@@ -1,16 +1,9 @@
-/**
- * CONTINUE LEARNING SECTION
- * =========================
- * Shared "Continue Learning" card and recommendations modal.
- * Used on the dashboard and on completed course views.
- */
-
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, NavigationEnd } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { takeUntil, filter, distinctUntilChanged, skip } from 'rxjs/operators';
 
 import { ApiService } from '../../services/api.service';
 import { StudentService } from '../../services/student.service';
@@ -36,15 +29,17 @@ import type { RecommendedCourse } from '../../models';
         <div class="continue-content">
           <span class="continue-label">Continue Learning</span>
 
-          <ng-container *ngIf="continueInfo.lesson && continueInfo.course">
+          <ng-container *ngIf="continueInfo.isReady && continueInfo.lesson && continueInfo.course">
             <h2 class="continue-lesson-title">{{ continueInfo.lesson.title }}</h2>
             <p class="continue-course-name">{{ continueInfo.course.title }}</p>
-            <p *ngIf="continueInfo.isReady" class="continue-progress">
+            <p class="continue-progress">
               {{ continueInfo.lesson.progress?.percent || 0 }}% complete
             </p>
-            <p *ngIf="continueInfo.hasNotStarted" class="continue-progress">
-              Not started yet
-            </p>
+          </ng-container>
+
+          <ng-container *ngIf="continueInfo.hasNotStarted">
+            <h2 class="continue-lesson-title">Discover your next course</h2>
+            <p class="continue-course-name">Browse courses in progress or enroll in something new.</p>
           </ng-container>
 
           <ng-container *ngIf="continueInfo.isCompleted">
@@ -62,14 +57,14 @@ import type { RecommendedCourse } from '../../models';
             </p>
           </ng-container>
 
-          <ng-container *ngIf="!continueInfo.lesson && !continueInfo.isCompleted">
+          <ng-container *ngIf="!continueInfo.lesson && !continueInfo.isCompleted && !continueInfo.hasNotStarted">
             <h2 class="continue-lesson-title">Ready to begin?</h2>
             <p class="continue-course-name">Pick a course below to start learning.</p>
           </ng-container>
         </div>
 
         <button class="continue-button" (click)="onContinueClick(continueInfo)">
-          Continue →
+          {{ continueInfo.isReady ? 'Continue →' : 'Discover →' }}
         </button>
       </div>
     </section>
@@ -422,8 +417,18 @@ export class ContinueLearningSectionComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.studentService.studentId$
-      .pipe(takeUntil(this.destroy$))
+      .pipe(
+        distinctUntilChanged(),
+        takeUntil(this.destroy$)
+      )
       .subscribe(() => this.loadContinueData());
+
+    this.router.events.pipe(
+      filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+      filter(event => event.urlAfterRedirects === '/' || event.urlAfterRedirects.startsWith('/?')),
+      skip(1),
+      takeUntil(this.destroy$)
+    ).subscribe(() => this.loadContinueData());
   }
 
   ngOnDestroy(): void {

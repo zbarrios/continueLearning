@@ -1,9 +1,3 @@
-/**
- * COURSE VIEW COMPONENT
- * =====================
- * Shows a single course with all its lessons and completion status.
- */
-
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -29,19 +23,15 @@ import type { CourseWithProgress, LessonWithProgress } from '../../models';
   imports: [CommonModule, ProgressBarComponent, ContinueLearningSectionComponent],
   template: `
     <div class="course-view">
-      <!-- Back button -->
       <button class="back-button" (click)="goBack()">
         ← Back to Dashboard
       </button>
 
-      <!-- Loading state -->
       <div *ngIf="loading$ | async" class="loading">
         Loading course...
       </div>
 
-      <!-- Course content -->
       <div *ngIf="course$ | async as course" class="course-content">
-        <!-- Course header -->
         <header class="course-header">
           <h1>{{ course.title }}</h1>
           <p class="course-description">{{ course.description }}</p>
@@ -55,7 +45,6 @@ import type { CourseWithProgress, LessonWithProgress } from '../../models';
           </div>
         </header>
 
-        <!-- Lessons list -->
         <section class="lessons-section">
           <h2>Lessons</h2>
           
@@ -80,20 +69,17 @@ import type { CourseWithProgress, LessonWithProgress } from '../../models';
               </div>
 
               <div class="lesson-status">
-                <!-- Completed -->
                 <span *ngIf="lesson.progress?.completed" class="status-badge completed">
                   ✓ Completed
                 </span>
-                
-                <!-- In progress -->
+
                 <span 
                   *ngIf="lesson.progress && !lesson.progress.completed && lesson.progress.percent > 0" 
                   class="status-badge in-progress"
                 >
                   {{ lesson.progress.percent }}%
                 </span>
-                
-                <!-- Not started -->
+
                 <span 
                   *ngIf="!lesson.progress || lesson.progress.percent === 0" 
                   class="status-badge not-started"
@@ -105,7 +91,6 @@ import type { CourseWithProgress, LessonWithProgress } from '../../models';
           </div>
         </section>
 
-        <!-- Completed course celebration -->
         <section *ngIf="isCourseComplete(course)" class="course-completed-section">
           <div class="congratulations-card">
             <span class="congratulations-icon">🎉</span>

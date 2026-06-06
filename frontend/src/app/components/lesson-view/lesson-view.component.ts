@@ -1,17 +1,4 @@
-/**
- * LESSON VIEW COMPONENT
- * =====================
- * Shows a single lesson with:
- * - Simulated video player (no file needed) or text content
- * - Progress tracking
- * - Mark as complete functionality
- * 
- * This is where the actual "Continue Learning" magic happens:
- * - User makes progress → recordProgress action dispatched
- * - Server applies MAX-WINS logic (progress never goes backwards)
- * - UI updates to reflect new progress
- */
-
+/** Lesson view: simulated video player, text content, progress → NgRx → API. */
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -558,7 +545,6 @@ export class LessonViewComponent implements OnInit, OnDestroy {
   course$: Observable<CourseWithProgress | null> = this.store.select(selectCurrentCourse);
   lessons$: Observable<LessonWithProgress[]> = this.store.select(selectCurrentCourseLessons);
 
-  // Current state (signals so computed values react to store updates)
   private courseId: string = '';
   lessonId = signal<string>('');
   lessons = signal<LessonWithProgress[]>([]);
@@ -595,11 +581,9 @@ export class LessonViewComponent implements OnInit, OnDestroy {
   courseName = computed(() => this.course()?.title ?? 'Course');
 
   ngOnInit(): void {
-    // Get route params
     this.courseId = this.route.snapshot.paramMap.get('courseId') || '';
     this.lessonId.set(this.route.snapshot.paramMap.get('lessonId') || '');
 
-    // Load course if not already loaded
     this.store.dispatch(loadCourse({ courseId: this.courseId }));
 
     this.lessons$.pipe(takeUntil(this.destroy$)).subscribe(lessons => {
@@ -616,7 +600,7 @@ export class LessonViewComponent implements OnInit, OnDestroy {
       this.course.set(course);
     });
 
-    // Set up debounced progress saving (every 5 seconds)
+    // Debounced save during simulated playback
     this.saveProgress$.pipe(
       debounceTime(5000),
       takeUntil(this.destroy$)
@@ -710,7 +694,6 @@ export class LessonViewComponent implements OnInit, OnDestroy {
   }
 
   markComplete(): void {
-    // Mark as 100% complete
     this.store.dispatch(recordProgress({
       lessonId: this.lessonId(),
       percent: 100
@@ -728,6 +711,14 @@ export class LessonViewComponent implements OnInit, OnDestroy {
     } else {
       this.localPercent.set(0);
       this.localPositionSeconds.set(0);
+    }
+
+    // Touch text lessons on view so Continue tracks updated_at (see DECISIONS.md)
+    if (current?.type === 'text' && !current.progress?.completed) {
+      this.store.dispatch(recordProgress({
+        lessonId: current.id,
+        percent: current.progress?.percent ?? 0
+      }));
     }
   }
 

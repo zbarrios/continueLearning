@@ -71,18 +71,24 @@ UPDATE progress SET
 
 **Recommendations modal (not started / all complete):**
 
-- Prefer **1 enrolled + 2 unenrolled** courses when unenrolled catalog exists.
-- If nothing unenrolled remains, show up to **3 enrolled** courses.
-- **New Course** → enroll, then open the course page (lesson list).
-- **Your Course** → open that course directly (no re-enroll).
+- Show up to **3 courses** total in the modal
+- **Priority:** enrolled courses in progress first (sorted by highest progress), then new courses
+- **Guarantee:** at least 1 new course if available (even if student has 3+ enrolled courses)
+- If no enrolled courses → show 3 new courses
+- **New Course** → enroll, then open the course page (lesson list)
+- **Your Course** → open that course directly (no re-enroll)
 
-**Rationale:** The Continue button is always visible and always leads somewhere obvious. The goal is zero hesitation on open — either resume work or discover the next course. A smarter recommender (popularity, skill graph, completion patterns) would be the next step; this build uses a simple enrollment-based mix.
+**Rationale:** The Continue button is always visible and always leads somewhere obvious. The goal is zero hesitation on open — either resume work or discover the next course. Guaranteeing at least one new course encourages exploration while prioritizing in-progress work.
 
-### Demo-only: student switcher (out of scope)
+### Demo-only extras (not required by the challenge)
 
-The **"Viewing as:"** dropdown and `GET /api/students` were **not** required by the challenge. We added them to switch quickly between the three seeded students (in-progress, complete, not started) while testing Continue, progress, and recommendations.
+These replace auth for local testing. Treat as demo tooling, not production features.
 
-**For reviewers:** Treat this as demo tooling, not part of the core submission. The switcher code is AI-generated and not representative of production auth.
+| Feature | Why it exists (one sentence for the interview) |
+| ------- | ---------------------------------------------- |
+| **Student switcher** + `GET /api/students` | I cut auth to stay in budget; the switcher lets reviewers flip between in-progress, complete, and not-started students without restarting. |
+| **Recommendations modal** | Continue must always lead somewhere — when nothing is in progress or everything is done, the modal surfaces the next course instead of a dead button. |
+| **Enroll endpoint** + extra courses | The modal needs something to recommend; enroll wires "pick a new course" into the same flow without building a full catalog or checkout. |
 
 ---
 
@@ -131,54 +137,6 @@ The **"Viewing as:"** dropdown and `GET /api/students` were **not** required by 
 │  └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
-
-### Data Flow: Recording Progress
-
-```
-User drags slider to 80%
-        │
-        ▼
-Component calls: this.localPercent.set(80)
-        │
-        ▼
-User clicks "Save Progress"
-        │
-        ▼
-Dispatch: recordProgress({ lessonId, percent: 80 })
-        │
-        ▼
-Effect catches action, calls API:
-  POST /api/students/student-1/progress
-  Body: { lessonId: "lesson-1-4", percent: 80 }
-        │
-        ▼
-Server validates:
-  - percent 0-100? ✓
-  - student enrolled? ✓
-        │
-        ▼
-Server applies MAX-WINS:
-  existing: 45% → incoming: 80% → store: 80%
-  (If incoming was 30%, would keep 45%)
-        │
-        ▼
-Server calculates course progress:
-  4/5 completed = 80%
-        │
-        ▼
-Response: { lessonProgress: {percent: 80}, courseProgress: {percent: 80} }
-        │
-        ▼
-Effect dispatches: recordProgressSuccess(...)
-        │
-        ▼
-Reducer updates state (immutably)
-        │
-        ▼
-Components re-render with new progress
-```
-
----
 
 ## 3. Code Review Analysis
 
@@ -294,26 +252,21 @@ export function recordProgress(
     throw new Error('Student not enrolled in this course');
   }
 
-  // 3. MAX-WINS LOGIC
-  const existing = queryOne<{...}>(
-    'SELECT percent, completed FROM progress WHERE student_id = ? AND lesson_id = ?',
-    [studentId, lessonId]
-  );
-
+  // 3. ATOMIC MAX-WINS UPSERT — single query, no race conditions
   const completed = percent >= COMPLETION_THRESHOLD ? 1 : 0;
 
-  if (existing) {
-    const newPercent = Math.max(existing.percent, percent);
-    const newCompleted = Math.max(existing.completed, completed);
-    // Only update position if we're making forward progress
-    const newPosition = percent > existing.percent 
-      ? (positionSeconds ?? null) 
-      : existing.last_position_seconds;
-
-    execute('UPDATE progress SET percent = ?, ...', [newPercent, ...]);
-  } else {
-    execute('INSERT INTO progress ...', [...]);
-  }
+  execute(`
+    INSERT INTO progress (student_id, lesson_id, percent, completed, last_position_seconds, updated_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT (student_id, lesson_id) DO UPDATE SET
+      percent = MAX(progress.percent, excluded.percent),
+      completed = MAX(progress.completed, excluded.completed),
+      last_position_seconds = CASE 
+        WHEN excluded.percent > progress.percent THEN excluded.last_position_seconds
+        ELSE progress.last_position_seconds
+      END,
+      updated_at = datetime('now')
+  `, [studentId, lessonId, percent, completed, positionSeconds ?? null]);
 
   // 4. CALCULATE (not store) COURSE PROGRESS
   const courseProgress = calculateCourseProgress(studentId, courseId);
@@ -326,24 +279,53 @@ export function recordProgress(
 
 1. **Validation first** — fail fast, return clear error messages. Original code had none.
 2. **Authorization before mutation** — prevents unauthorized data modification. Security 101.
-3. **Max-wins with explicit comparison:**
-  - `Math.max(existing.percent, percent)` — progress never decreases
-  - `Math.max(existing.completed, completed)` — once complete, stays complete
-  - Position only updates if percent increases — prevents stale position from overwriting good position
+3. **Single atomic upsert with MAX():**
+   - `MAX(progress.percent, excluded.percent)` — progress never decreases
+   - `MAX(progress.completed, excluded.completed)` — once complete, stays complete
+   - `CASE WHEN excluded.percent > progress.percent` — position only updates if making forward progress
+   - **No race conditions:** read-modify-write in one atomic operation
 4. **Calculate on read:**
-  - Course progress is calculated, not stored
-  - Eliminates sync bugs, race conditions on course updates
-  - Slightly more work per request, but data is always accurate
+   - Course progress is calculated, not stored
+   - Eliminates sync bugs, race conditions on course updates
+   - Slightly more work per request, but data is always accurate
 5. **Return both lesson and course progress:**
-  - UI needs both to update
-  - Single request instead of two
-  - Response contains the *actual stored values*, which may differ from input (max-wins)
+   - UI needs both to update
+   - Single request instead of two
+   - Response contains the *actual stored values*, which may differ from input (max-wins)
 
-### Why Not Use a Transaction?
+### Why This Beats Read-Then-Update
 
-The original code had separate `db.save(progress)` and `db.save(course)` calls — crash between them = inconsistent state.
+The original code had a race condition: two concurrent requests could both read progress, both compute max, and one would overwrite the other. The `INSERT ... ON CONFLICT DO UPDATE` pattern is **atomic by nature in SQLite** — the database engine handles locking. No transaction wrapper needed because there's only one write statement.
 
-My approach doesn't store course progress at all, so there's only one write. The "upsert" pattern (INSERT ... ON CONFLICT DO UPDATE) is atomic by nature in SQLite.
+### NgRx Effect: `recordProgress$`
+
+**Location:** `frontend/src/app/store/app.effects.ts`
+
+The frontend counterpart to the backend function. This effect orchestrates the state update flow:
+
+```typescript
+recordProgress$ = createEffect(() =>
+  this.actions$.pipe(
+    ofType(AppActions.recordProgress),
+    mergeMap(({ lessonId, percent, positionSeconds }) =>
+      this.api.recordProgress({ lessonId, percent, positionSeconds }).pipe(
+        map(response => AppActions.recordProgressSuccess({
+          lessonId,
+          lessonProgress: response.lessonProgress,
+          courseProgress: response.courseProgress
+        })),
+        catchError(error => of(AppActions.recordProgressFailure({ error: error.message })))
+      )
+    )
+  )
+);
+```
+
+**Key decisions:**
+
+1. **`mergeMap` not `switchMap`:** Progress saves should never be cancelled — user clicks "Save", we save. `switchMap` would cancel in-flight requests if user clicks again quickly.
+2. **Chained effect:** `refreshContinueAfterProgress$` listens for `recordProgressSuccess` and dispatches `loadContinueLesson()` — ensures the "Continue" button always shows the correct next lesson.
+3. **Actual stored values returned:** The response contains `lessonProgress` with the *real* database values after max-wins, not the values we sent. The reducer stores these, so the UI reflects truth.
 
 ---
 

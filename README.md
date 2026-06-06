@@ -4,7 +4,7 @@ Run the app locally in two terminals. No `.env` file, no manual database setup â
 
 ## Prerequisites
 
-- **Node.js 18+** (tested with v24.16.0)
+- **Node.js 22.22.3+** or **24.15.0+** (Angular CLI requirement; tested with v24.16.0)
 - **npm 9+** (tested with v11.13.0)
 
 Check versions:
@@ -54,7 +54,7 @@ The app ships with **3 pre-seeded students**. Use the **"Viewing as:"** dropdown
 
 | Student | What to expect |
 |---------|----------------|
-| **Alice Chen** | JS course in progress (~45% on lesson 4) |
+| **Alice Chen** | JS course 60% (3/5 done, lesson 4 at 45%); TS not started |
 | **Bob Martinez** | JS course complete; TS not started |
 | **Carol Okonkwo** | TypeScript only; 0% progress |
 
@@ -69,6 +69,8 @@ The selected student persists in `localStorage` (`tutorstream-student-id`) acros
 | `/api/students/:id/courses/:courseId` | GET | Single course with lessons |
 | `/api/students/:id/progress` | POST | Record progress on a lesson |
 | `/api/students/:id/continue` | GET | Get next lesson to resume |
+| `/api/courses/recommended?studentId=` | GET | Up to 3 courses for the continue-learning modal |
+| `/api/students/:id/enrollments` | POST | Enroll in a course (`{ courseId }`) |
 
 
 ## Troubleshooting

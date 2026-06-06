@@ -1,12 +1,3 @@
-/**
- * DASHBOARD COMPONENT
- * ===================
- * The main view showing:
- * 1. Student switcher (demo feature)
- * 2. "Continue Learning" call-to-action button
- * 3. List of enrolled courses with progress
- */
-
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -38,7 +29,6 @@ import type { CourseWithProgress, Student } from '../../models';
             <p class="subtitle">Continue your learning journey</p>
           </div>
           
-          <!-- Student Switcher (Demo Feature) -->
           <div class="student-switcher">
             <label for="student-select">Viewing as:</label>
             <select 
@@ -55,12 +45,10 @@ import type { CourseWithProgress, Student } from '../../models';
         </div>
       </header>
 
-      <!-- Continue Learning Section — button always visible -->
       <div class="dashboard-continue-wrap">
         <app-continue-learning-section></app-continue-learning-section>
       </div>
 
-      <!-- Courses List -->
       <section class="courses-section">
         <h2>Your Courses</h2>
         
@@ -237,7 +225,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .subscribe(students => {
         this.students = students;
         this.selectedStudentId = this.studentService.getStudentId();
-        // Load data for selected student
         this.loadStudentData();
       });
   }
@@ -247,25 +234,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  /**
-   * Load courses and continue lesson for current student
-   */
   private loadStudentData(): void {
     this.store.dispatch(loadCourses());
   }
 
-  /**
-   * Handle student selection change
-   */
   onStudentChange(studentId: string): void {
     this.selectedStudentId = studentId;
     this.studentService.setStudentId(studentId);
     this.loadStudentData();
   }
 
-  /**
-   * Navigate to course detail view
-   */
   onCourseClick(courseId: string): void {
     this.router.navigate(['/course', courseId]);
   }
