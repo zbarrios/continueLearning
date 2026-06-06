@@ -1,4 +1,3 @@
-/** Lesson view: simulated video player, text content, progress → NgRx → API. */
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -21,22 +20,18 @@ import type { CourseWithProgress, LessonWithProgress } from '../../models';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="lesson-view">
-      <!-- Navigation -->
       <div class="lesson-nav">
         <button class="nav-button" (click)="goToCourse()">
           ← Back to {{ courseName() }}
         </button>
       </div>
 
-      <!-- Lesson content -->
       <div class="lesson-container" *ngIf="currentLesson() as lesson">
-        <!-- Header -->
         <header class="lesson-header">
           <span class="lesson-position">Lesson {{ lesson.position }}</span>
           <h1>{{ lesson.title }}</h1>
         </header>
 
-        <!-- Video lesson — simulated playback -->
         <div *ngIf="lesson.type === 'video'" class="video-section">
           <div class="video-meta">
             <span class="video-type-badge">📹 Video</span>
@@ -104,7 +99,6 @@ import type { CourseWithProgress, LessonWithProgress } from '../../models';
           </div>
         </div>
 
-        <!-- Text lesson -->
         <div *ngIf="lesson.type === 'text'" class="text-section">
           <div class="text-content">
             <h2>{{ lesson.title }}</h2>
@@ -157,7 +151,6 @@ import type { CourseWithProgress, LessonWithProgress } from '../../models';
           </div>
         </div>
 
-        <!-- Navigation between lessons -->
         <div class="lesson-navigation">
           <button
             class="nav-lesson-button prev"
@@ -541,7 +534,6 @@ export class LessonViewComponent implements OnInit, OnDestroy {
   localPositionSeconds = signal<number>(0);
   isPlaying = signal<boolean>(false);
 
-  // Observables from store
   course$: Observable<CourseWithProgress | null> = this.store.select(selectCurrentCourse);
   lessons$: Observable<LessonWithProgress[]> = this.store.select(selectCurrentCourseLessons);
 
@@ -600,7 +592,6 @@ export class LessonViewComponent implements OnInit, OnDestroy {
       this.course.set(course);
     });
 
-    // Debounced save during simulated playback
     this.saveProgress$.pipe(
       debounceTime(5000),
       takeUntil(this.destroy$)
@@ -713,7 +704,7 @@ export class LessonViewComponent implements OnInit, OnDestroy {
       this.localPositionSeconds.set(0);
     }
 
-    // Touch text lessons on view so Continue tracks updated_at (see DECISIONS.md)
+    // Record 0% on text-lesson view so Continue tracks updated_at
     if (current?.type === 'text' && !current.progress?.completed) {
       this.store.dispatch(recordProgress({
         lessonId: current.id,

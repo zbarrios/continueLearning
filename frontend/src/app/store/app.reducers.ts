@@ -129,7 +129,6 @@ export const continueReducer = createReducer(
     error
   })),
 
-  // Effect re-fetches continue lesson after this
   on(Actions.recordProgressSuccess, (state): ContinueState => ({
     ...state,
     status: 'loading'

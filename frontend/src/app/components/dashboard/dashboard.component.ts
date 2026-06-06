@@ -210,16 +210,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private studentService = inject(StudentService);
   private destroy$ = new Subject<void>();
 
-  // Store observables
   courses$: Observable<CourseWithProgress[]> = this.store.select(selectCourses);
   loading$: Observable<boolean> = this.store.select(selectCoursesLoading);
 
-  // Student data
   students: Student[] = [];
   selectedStudentId: string = '';
 
   ngOnInit(): void {
-    // Load students list
     this.studentService.initialize()
       .pipe(takeUntil(this.destroy$))
       .subscribe(students => {
