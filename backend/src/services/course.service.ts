@@ -122,7 +122,7 @@ function enrichCourseWithProgress(course: Course, studentId: string): CourseWith
     FROM progress p
     INNER JOIN lessons l ON l.id = p.lesson_id
     WHERE p.student_id = ? AND l.course_id = ?
-    ORDER BY p.updated_at DESC
+    ORDER BY p.updated_at DESC, l.position DESC
     LIMIT 1
   `, [studentId, course.id]);
 

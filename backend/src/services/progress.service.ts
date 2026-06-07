@@ -7,6 +7,9 @@ import type {
 
 const COMPLETION_THRESHOLD = 95;
 
+// Subsecond precision so sequential saves in the same second remain ordered.
+const PROGRESS_TIMESTAMP = "strftime('%Y-%m-%d %H:%M:%f', 'now')";
+
 export function recordProgress(
   studentId: string,
   lessonId: string,
@@ -30,7 +33,7 @@ export function recordProgress(
   // Max-wins upsert: progress never decreases; atomic, no read-modify-write race.
   execute(`
     INSERT INTO progress (student_id, lesson_id, percent, completed, last_position_seconds, updated_at)
-    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, ?, ?, ${PROGRESS_TIMESTAMP})
     ON CONFLICT (student_id, lesson_id) DO UPDATE SET
       percent = MAX(progress.percent, excluded.percent),
       completed = MAX(progress.completed, excluded.completed),
@@ -38,7 +41,7 @@ export function recordProgress(
         WHEN excluded.percent > progress.percent THEN excluded.last_position_seconds
         ELSE progress.last_position_seconds
       END,
-      updated_at = datetime('now')
+      updated_at = ${PROGRESS_TIMESTAMP}
   `, [studentId, lessonId, percent, completed, positionSeconds ?? null]);
 
   const courseId = getCourseIdForLesson(lessonId);
@@ -112,7 +115,7 @@ export function getContinueLesson(studentId: string): ContinueLearningResponse {
     INNER JOIN courses c ON c.id = l.course_id
     INNER JOIN enrollments e ON e.course_id = c.id AND e.student_id = p.student_id
     WHERE p.student_id = ? AND p.completed = 0
-    ORDER BY p.updated_at DESC
+    ORDER BY p.updated_at DESC, l.position DESC
     LIMIT 1
   `, [studentId]);
 

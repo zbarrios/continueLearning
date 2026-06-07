@@ -37,20 +37,23 @@ export const coursesReducer = createReducer(
         return course;
       }
 
+      const existingLast = course.lastAccessedLesson;
+      const updatedLastAccessed = existingLast?.id === lessonId
+        ? {
+            ...existingLast,
+            progress: {
+              ...existingLast.progress,
+              ...lessonProgress,
+              lastPositionSeconds:
+                lessonProgress.lastPositionSeconds ?? existingLast.progress?.lastPositionSeconds ?? null
+            }
+          }
+        : existingLast;
+
       return {
         ...course,
         progress: courseProgress,
-        lastAccessedLesson: course.lastAccessedLesson?.id === lessonId
-          ? {
-              ...course.lastAccessedLesson,
-              progress: {
-                ...course.lastAccessedLesson.progress,
-                ...lessonProgress,
-                lastPositionSeconds:
-                  lessonProgress.lastPositionSeconds ?? course.lastAccessedLesson.progress?.lastPositionSeconds ?? null
-              }
-            }
-          : course.lastAccessedLesson
+        lastAccessedLesson: updatedLastAccessed
       };
     })
   }))
@@ -98,9 +101,20 @@ export const currentCourseReducer = createReducer(
       return lesson;
     });
 
+    const savedLesson = updatedLessons.find(lesson => lesson.id === lessonId);
+
     return {
       ...state,
-      course: { ...state.course, progress: courseProgress },
+      course: {
+        ...state.course,
+        progress: courseProgress,
+        lastAccessedLesson: savedLesson
+          ? {
+              ...savedLesson,
+              progress: savedLesson.progress!
+            }
+          : state.course.lastAccessedLesson
+      },
       lessons: updatedLessons
     };
   })

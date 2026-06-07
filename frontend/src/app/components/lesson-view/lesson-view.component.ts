@@ -3,12 +3,14 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Store } from '@ngrx/store';
-import { Observable, Subject } from 'rxjs';
+import { Actions, ofType } from '@ngrx/effects';
+import { Observable, Subject, race, timer } from 'rxjs';
 import { debounceTime, filter, take, takeUntil } from 'rxjs/operators';
 
 import {
   loadCourse,
   recordProgress,
+  recordProgressSuccess,
   selectCurrentCourse,
   selectCurrentCourseLessons
 } from '../../store';
@@ -523,6 +525,7 @@ import type { CourseWithProgress, LessonWithProgress } from '../../models';
 })
 export class LessonViewComponent implements OnInit, OnDestroy {
   private store = inject(Store);
+  private actions$ = inject(Actions);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private destroy$ = new Subject<void>();
@@ -606,6 +609,7 @@ export class LessonViewComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopPlayback();
+    this.touchCurrentTextLessonIfNeeded();
     this.persistProgress();
     this.destroy$.next();
     this.destroy$.complete();
@@ -670,18 +674,76 @@ export class LessonViewComponent implements OnInit, OnDestroy {
     this.localPercent.set(percent);
   }
 
-  private persistProgress(percent = this.localPercent(), positionSeconds = this.localPositionSeconds()): void {
+  private persistProgress(percent = this.localPercent(), positionSeconds = this.localPositionSeconds()): boolean {
     const lesson = this.currentLesson();
-    if (!lesson || lesson.type !== 'video') return;
+    if (!lesson || lesson.type !== 'video') return false;
 
     const savedPercent = lesson.progress?.percent ?? 0;
-    if (percent < savedPercent) return;
+    if (percent < savedPercent) return false;
 
     this.store.dispatch(recordProgress({
       lessonId: this.lessonId(),
       percent,
       positionSeconds
     }));
+    return true;
+  }
+
+  private touchCurrentTextLessonIfNeeded(): void {
+    const lesson = this.currentLesson();
+    if (lesson?.type === 'text') {
+      this.touchLessonAccess(lesson);
+    }
+  }
+
+  private touchLessonAccess(lesson: LessonWithProgress): void {
+    if (lesson.type !== 'text') return;
+
+    this.store.dispatch(recordProgress({
+      lessonId: lesson.id,
+      percent: lesson.progress?.percent ?? 0
+    }));
+  }
+
+  private waitForLessonSave(lessonId: string, onComplete: () => void): void {
+    race(
+      this.actions$.pipe(
+        ofType(recordProgressSuccess),
+        filter(action => action.lessonId === lessonId),
+        take(1)
+      ),
+      timer(5000)
+    ).pipe(
+      take(1),
+      takeUntil(this.destroy$)
+    ).subscribe(() => onComplete());
+  }
+
+  private navigateToLesson(lessonId: string): void {
+    this.router.navigate(['/course', this.courseId, 'lesson', lessonId]);
+    this.lessonId.set(lessonId);
+    this.initializeLocalProgress();
+  }
+
+  private navigateAfterExitSave(targetLessonId: string): void {
+    this.stopPlayback();
+    const exitingLessonId = this.lessonId();
+    const targetLesson = this.lessons().find(l => l.id === targetLessonId);
+    const dispatched = this.persistProgress();
+
+    const finishNavigation = () => {
+      this.navigateToLesson(targetLessonId);
+      if (targetLesson?.type === 'text') {
+        this.waitForLessonSave(targetLessonId, () => undefined);
+      }
+    };
+
+    if (!dispatched) {
+      finishNavigation();
+      return;
+    }
+
+    this.waitForLessonSave(exitingLessonId, finishNavigation);
   }
 
   markComplete(): void {
@@ -704,12 +766,8 @@ export class LessonViewComponent implements OnInit, OnDestroy {
       this.localPositionSeconds.set(0);
     }
 
-    // Record 0% on text-lesson view so Continue tracks updated_at
-    if (current?.type === 'text' && !current.progress?.completed) {
-      this.store.dispatch(recordProgress({
-        lessonId: current.id,
-        percent: current.progress?.percent ?? 0
-      }));
+    if (current?.type === 'text') {
+      this.touchLessonAccess(current);
     }
   }
 
@@ -720,19 +778,34 @@ export class LessonViewComponent implements OnInit, OnDestroy {
 
   goToCourse(): void {
     this.stopPlayback();
-    this.persistProgress();
-    this.router.navigate(['/course', this.courseId]);
+    const lesson = this.currentLesson();
+    const exitingLessonId = this.lessonId();
+
+    if (lesson?.type === 'text') {
+      this.touchCurrentTextLessonIfNeeded();
+      this.waitForLessonSave(exitingLessonId, () => {
+        this.router.navigate(['/course', this.courseId]);
+      });
+      return;
+    }
+
+    const dispatched = this.persistProgress();
+
+    if (!dispatched) {
+      this.router.navigate(['/course', this.courseId]);
+      return;
+    }
+
+    this.waitForLessonSave(exitingLessonId, () => {
+      this.router.navigate(['/course', this.courseId]);
+    });
   }
 
   goToNextLesson(): void {
     const next = this.nextLesson();
     if (!next) return;
 
-    this.stopPlayback();
-    this.persistProgress();
-    this.router.navigate(['/course', this.courseId, 'lesson', next.id]);
-    this.lessonId.set(next.id);
-    this.initializeLocalProgress();
+    this.navigateAfterExitSave(next.id);
   }
 
   onNextAction(): void {
@@ -756,11 +829,7 @@ export class LessonViewComponent implements OnInit, OnDestroy {
     const prev = this.prevLesson();
     if (!prev) return;
 
-    this.stopPlayback();
-    this.persistProgress();
-    this.router.navigate(['/course', this.courseId, 'lesson', prev.id]);
-    this.lessonId.set(prev.id);
-    this.initializeLocalProgress();
+    this.navigateAfterExitSave(prev.id);
   }
 
   formatDuration(seconds: number): string {
